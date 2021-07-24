@@ -34,7 +34,7 @@ from transformers import (
     AutoConfig,
     # AutoModelForTokenClassification,
     AutoTokenizer,
-    DataCollatorForTokenClassification,
+    # DataCollatorForTokenClassification,
     HfArgumentParser,
     PreTrainedTokenizerFast,
     # Trainer,
@@ -50,7 +50,6 @@ from my_transformers import (
     MyBertForTokenClassification,
     MyDataCollatorForTokenClassification,
 )
-
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.10.0.dev0")
