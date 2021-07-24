@@ -32,12 +32,12 @@ from datasets import ClassLabel, load_dataset, load_metric
 import transformers
 from transformers import (
     AutoConfig,
-    AutoModelForTokenClassification,
+    # AutoModelForTokenClassification,
     AutoTokenizer,
     DataCollatorForTokenClassification,
     HfArgumentParser,
     PreTrainedTokenizerFast,
-    Trainer,
+    # Trainer,
     TrainingArguments,
     set_seed,
 )
@@ -45,11 +45,17 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 
+from my_transformers import (
+    MyTrainer,
+    MyBertForTokenClassification,
+    MyDataCollatorForTokenClassification,
+)
+
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
-check_min_version("4.10.0.dev0")
+# check_min_version("4.10.0.dev0")
 
-require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/token-classification/requirements.txt")
+# require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/token-classification/requirements.txt")
 
 logger = logging.getLogger(__name__)
 
@@ -331,7 +337,7 @@ def main():
             use_auth_token=True if model_args.use_auth_token else None,
         )
 
-    model = AutoModelForTokenClassification.from_pretrained(
+    model = MyBertForTokenClassification.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -430,7 +436,7 @@ def main():
             )
 
     # Data collator
-    data_collator = DataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
+    data_collator = MyDataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
 
     # Metrics
     metric = load_metric("seqeval")
@@ -469,7 +475,7 @@ def main():
             }
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = MyTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,

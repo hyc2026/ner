@@ -1,2 +1,6 @@
+pretrained_model
 data
+output
 
+.cache
+*/__pycache__
