@@ -30,13 +30,13 @@ from datasets import load_dataset, load_metric
 import transformers
 from transformers import (
     AutoConfig,
-    AutoModelForSequenceClassification,
+    # AutoModelForSequenceClassification,
     AutoTokenizer,
     DataCollatorWithPadding,
     EvalPrediction,
     HfArgumentParser,
     PretrainedConfig,
-    Trainer,
+    # Trainer,
     TrainingArguments,
     default_data_collator,
     set_seed,
@@ -45,6 +45,10 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
 from transformers.utils.versions import require_version
 
+from my_transformers import (
+    MyTrainer,
+    MyBertForSequenceClassification,
+)
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 # check_min_version("4.10.0.dev0")
@@ -328,7 +332,7 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    model = AutoModelForSequenceClassification.from_pretrained(
+    model = MyBertForSequenceClassification.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -471,7 +475,7 @@ def main():
         data_collator = None
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer = MyTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
