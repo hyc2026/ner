@@ -463,6 +463,8 @@ def main():
     metric1 = load_metric("accuracy")
 
     def compute_metrics(p):
+        q = (p[0][1], p[1][1])
+        p = (p[0][0], p[1][0])
         predictions, labels = p
         predictions = np.argmax(predictions, axis=2)
 
@@ -475,8 +477,10 @@ def main():
             [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
             for prediction, label in zip(predictions, labels)
         ]
-
         results = metric.compute(predictions=true_predictions, references=true_labels)
+        preds = np.argmax(q[0], axis=1)
+        # preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
+
         if data_args.return_entity_level_metrics:
             # Unpack nested dictionaries
             final_results = {}
@@ -489,13 +493,15 @@ def main():
             return final_results
         else:
             return {
+                "accuracy": (preds == q[1]).astype(np.float32).mean().item(),
                 "precision": results["overall_precision"],
                 "recall": results["overall_recall"],
                 "f1": results["overall_f1"],
-                "accuracy": results["overall_accuracy"],
+                "seqeval_accuracy": results["overall_accuracy"],
             }
 
     # Initialize our Trainer
+    # training_args.label_names.append("label")
     trainer = MyTrainer(
         model=model,
         args=training_args,
