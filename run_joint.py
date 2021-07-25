@@ -31,7 +31,7 @@ from datasets import ClassLabel, load_dataset, load_metric
 
 import transformers
 from transformers import (
-    AutoConfig,
+    # AutoConfig,
     # AutoModelForTokenClassification,
     AutoTokenizer,
     # DataCollatorForTokenClassification,
@@ -49,6 +49,7 @@ from my_transformers import (
     MyTrainer,
     MyBertForTokenClassification,
     MyDataCollatorForTokenClassification,
+    MyBertConfig,
 )
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -267,6 +268,9 @@ def main():
     else:
         column_names = raw_datasets["validation"].column_names
         features = raw_datasets["validation"].features
+    # column_names = ['id', 'tokens', 'ner_tags', 'label']
+    # features = {'id': Value(dtype='int64', id=None), 'tokens': Sequence(feature=Value(dtype='string', id=None), length=-1, id=None),
+    #             'ner_tags': Sequence(feature=Value(dtype='string', id=None), length=-1, id=None), 'label': Value(dtype='string', id=None)}
 
     if data_args.text_column_name is not None:
         text_column_name = data_args.text_column_name
@@ -274,13 +278,15 @@ def main():
         text_column_name = "tokens"
     else:
         text_column_name = column_names[0]
-
+    # text_column_name = "tokens"
+    
     if data_args.label_column_name is not None:
         label_column_name = data_args.label_column_name
     elif f"{data_args.task_name}_tags" in column_names:
         label_column_name = f"{data_args.task_name}_tags"
     else:
         label_column_name = column_names[1]
+    # label_column_name = 'ner_tags'
 
     # In the event the labels are not a `Sequence[ClassLabel]`, we will need to go through the dataset to get the
     # unique labels.
@@ -300,13 +306,20 @@ def main():
         label_list = get_label_list(raw_datasets["train"][label_column_name])
         label_to_id = {l: i for i, l in enumerate(label_list)}
     num_labels = len(label_list)
+    # label_list = ['B-ORG', 'B-PER', 'I-ORG', 'I-PER', 'O']
+    # label_to_id = {'B-ORG': 0, 'B-PER': 1, 'I-ORG': 2, 'I-PER': 3, 'O': 4}
+    # num_labels = 5
 
+    # Labels
+    cls_label_list = raw_datasets["train"].unique("label")
+    cls_label_list.sort()  # Let's sort it for determinism
+    
     # Load pretrained model and tokenizer
     #
     # Distributed training:
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
-    config = AutoConfig.from_pretrained(
+    config = MyBertConfig.from_pretrained(
         model_args.config_name if model_args.config_name else model_args.model_name_or_path,
         num_labels=num_labels,
         label2id=label_to_id,
@@ -352,6 +365,13 @@ def main():
             "at https://huggingface.co/transformers/index.html#supported-frameworks to find the model types that meet this "
             "requirement"
         )
+
+    sentence1_key, sentence2_key = "tokens", None
+    cls_label_to_id = {v: i for i, v in enumerate(cls_label_list)}
+
+    if label_to_id is not None:
+        model.config.cls_label2id = cls_label_to_id
+        model.config.id2cls_label = {id: label for label, id in config.cls_label2id.items()}
 
     # Preprocessing the dataset
     # Padding strategy
@@ -439,6 +459,7 @@ def main():
 
     # Metrics
     metric = load_metric("seqeval")
+    metric1 = load_metric("accuracy")
 
     def compute_metrics(p):
         predictions, labels = p

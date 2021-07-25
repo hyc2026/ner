@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "/home/heyc-s21/data/credit_report/run_glue.py",
             "console": "integratedTerminal",
-            "pythonPath": "/home/heyc-s21/miniconda3/envs/nlp/bin/python",
+            "python": "/home/heyc-s21/miniconda3/envs/nlp/bin/python",
             "cwd": "/home/heyc-s21/data/credit_report",
             "args": [
                 "--model_name_or_path", "./pretrained_model/chinese-bert-wwm",
@@ -38,7 +38,34 @@
             "request": "launch",
             "program": "/home/heyc-s21/data/credit_report/run_ner.py",
             "console": "integratedTerminal",
-            "pythonPath": "/home/heyc-s21/miniconda3/envs/nlp/bin/python",
+            "python": "/home/heyc-s21/miniconda3/envs/nlp/bin/python",
+            "cwd": "/home/heyc-s21/data/credit_report",
+            "args": [
+                "--model_name_or_path", "./pretrained_model/chinese-bert-wwm",
+                "--train_file", "./data/tiny_train.json",
+                "--validation_file", "./data/tiny_train.json",
+                "--test_file", "./data/tiny_train.json",
+                "--do_train",
+                "--do_predict",
+                "--do_eval",
+                "--per_device_train_batch_size", "32",
+                "--learning_rate", "2e-5",
+                "--num_train_epochs", "3",
+                "--output_dir", "./output",
+                "--overwrite_output_dir", "true"
+            ],
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "run_joint",
+            "type": "python",
+            "request": "launch",
+            "program": "/home/heyc-s21/data/credit_report/run_joint.py",
+            "console": "integratedTerminal",
+            "python": "/home/heyc-s21/miniconda3/envs/nlp/bin/python",
             "cwd": "/home/heyc-s21/data/credit_report",
             "args": [
                 "--model_name_or_path", "./pretrained_model/chinese-bert-wwm",
