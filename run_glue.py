@@ -350,7 +350,7 @@ def main():
             #     sentence1_key, sentence2_key = non_label_column_names[:2]
             # else:
             #     sentence1_key, sentence2_key = non_label_column_names[0], None
-            sentence1_key, sentence2_key = "text", None
+            sentence1_key, sentence2_key = "tokens", None
 
     # Padding strategy
     if data_args.pad_to_max_length:
@@ -395,7 +395,13 @@ def main():
         args = (
             (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
         )
-        result = tokenizer(*args, padding=padding, max_length=max_seq_length, truncation=True)
+        result = tokenizer(*args,
+            padding=padding,
+            max_length=max_seq_length,
+            truncation=True,
+            # We use this argument because the texts in our dataset are lists of words (with a label for each word).
+            is_split_into_words=True
+        )
 
         # Map labels to IDs (not necessary for GLUE tasks)
         if label_to_id is not None and "label" in examples:
