@@ -1121,3 +1121,29 @@ class MyTrainer(Trainer):
                 metrics[f"{metric_key_prefix}_{key}"] = metrics.pop(key)
 
         return EvalLoopOutput(predictions=all_preds, label_ids=all_labels, metrics=metrics, num_samples=num_samples)
+
+    def _remove_unused_columns(self, dataset: "datasets.Dataset", description: Optional[str] = None):
+        if not self.args.remove_unused_columns:
+            return dataset
+        if self._signature_columns is None:
+            # Inspect model forward signature to keep only the arguments it accepts.
+            signature = inspect.signature(self.model.forward)
+            self._signature_columns = list(signature.parameters.keys())
+            # Labels may be named label or label_ids, the default data collator handles that.
+            self._signature_columns += ["label", "label_ids"]
+        columns = [k for k in self._signature_columns if k in dataset.column_names]
+        ignored_columns = list(set(dataset.column_names) - set(self._signature_columns))
+        if len(ignored_columns) > 0:
+            dset_description = "" if description is None else f"in the {description} set "
+            logger.info(
+                f"The following columns {dset_description} don't have a corresponding argument in "
+                f"`{self.model.__class__.__name__}.forward` and have been ignored: {', '.join(ignored_columns)}."
+            )
+
+        if version.parse(datasets.__version__) < version.parse("1.4.0"):
+            dataset.set_format(
+                type=dataset.format["type"], columns=columns, format_kwargs=dataset.format["format_kwargs"]
+            )
+            return dataset
+        else:
+            return dataset.remove_columns(ignored_columns)
