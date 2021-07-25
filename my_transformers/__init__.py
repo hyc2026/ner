@@ -4,3 +4,4 @@ from my_transformers.models.bert.modeling_bert import MyBertForTokenClassificati
 from my_transformers.models.bert.modeling_bert import MyBertForSequenceClassification
 from my_transformers.models.bert.configuration_bert import MyBertConfig
 from my_transformers.data.data_collator import MyDataCollatorForTokenClassification
+from my_transformers.modeling_outputs import MyTokenClassifierOutput

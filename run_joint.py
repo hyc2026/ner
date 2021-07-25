@@ -329,6 +329,14 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
+    
+    sentence1_key, sentence2_key = "tokens", None
+    cls_label_to_id = {v: i for i, v in enumerate(cls_label_list)}
+
+    if label_to_id is not None:
+        config.cls_label2id = cls_label_to_id
+        config.id2cls_label = {id: label for label, id in config.cls_label2id.items()}
+
 
     tokenizer_name_or_path = model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path
     if config.model_type in {"gpt2", "roberta"}:
@@ -365,13 +373,6 @@ def main():
             "at https://huggingface.co/transformers/index.html#supported-frameworks to find the model types that meet this "
             "requirement"
         )
-
-    sentence1_key, sentence2_key = "tokens", None
-    cls_label_to_id = {v: i for i, v in enumerate(cls_label_list)}
-
-    if label_to_id is not None:
-        model.config.cls_label2id = cls_label_to_id
-        model.config.id2cls_label = {id: label for label, id in config.cls_label2id.items()}
 
     # Preprocessing the dataset
     # Padding strategy
@@ -455,7 +456,7 @@ def main():
             )
 
     # Data collator
-    data_collator = MyDataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
+    data_collator = MyDataCollatorForTokenClassification(tokenizer, config=model.config, pad_to_multiple_of=8 if training_args.fp16 else None)
 
     # Metrics
     metric = load_metric("seqeval")
