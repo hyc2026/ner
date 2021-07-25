@@ -399,7 +399,8 @@ def main():
         args = (
             (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
         )
-        result = tokenizer(*args,
+        result = tokenizer(
+            *args,
             padding=padding,
             max_length=max_seq_length,
             truncation=True,
