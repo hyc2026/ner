@@ -1,7 +1,7 @@
 export TASK_NAME=cola
-TRAIN_FILE=./data/tiny_train.json
-VAL_FILE=./data/tiny_train.json
-TEST_FILE=./data/tiny_train.json
+TRAIN_FILE=./data/glue_train.json
+VAL_FILE=./data/glue_train.json
+TEST_FILE=./data/glue_train.json
 
 python run_glue.py \
   --model_name_or_path ./pretrained_model/chinese-bert-wwm \

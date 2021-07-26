@@ -47,8 +47,8 @@ from transformers.utils.versions import require_version
 
 from my_transformers import (
     MyTrainer,
-    MyBertForTokenClassification,
-    MyDataCollatorForTokenClassification,
+    MyBertForJointClassification,
+    MyDataCollatorForJointClassification,
     MyBertConfig,
 )
 
@@ -330,7 +330,6 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
     
-    sentence1_key, sentence2_key = "tokens", None
     cls_label_to_id = {v: i for i, v in enumerate(cls_label_list)}
 
     if label_to_id is not None:
@@ -357,7 +356,7 @@ def main():
             use_auth_token=True if model_args.use_auth_token else None,
         )
 
-    model = MyBertForTokenClassification.from_pretrained(
+    model = MyBertForJointClassification.from_pretrained(
         model_args.model_name_or_path,
         from_tf=bool(".ckpt" in model_args.model_name_or_path),
         config=config,
@@ -456,29 +455,27 @@ def main():
             )
 
     # Data collator
-    data_collator = MyDataCollatorForTokenClassification(tokenizer, config=model.config, pad_to_multiple_of=8 if training_args.fp16 else None)
+    data_collator = MyDataCollatorForJointClassification(tokenizer, config=model.config, pad_to_multiple_of=8 if training_args.fp16 else None)
 
     # Metrics
     metric = load_metric("seqeval")
-    # metric1 = load_metric("accuracy")
 
     def compute_metrics(p):
-        q = (p[0][1], p[1][1])
-        p = (p[0][0], p[1][0])
-        predictions, labels = p
-        predictions = np.argmax(predictions, axis=2)
+        text_predictions, text_labels = p[0][1], p[1][1]
+        token_predictions, token_labels = p[0][0], p[1][0]
+        token_predictions = np.argmax(token_predictions, axis=2)
 
         # Remove ignored index (special tokens)
         true_predictions = [
             [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
+            for prediction, label in zip(token_predictions, token_labels)
         ]
         true_labels = [
             [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
+            for prediction, label in zip(token_predictions, token_labels)
         ]
         results = metric.compute(predictions=true_predictions, references=true_labels)
-        preds = np.argmax(q[0], axis=1)
+        text_preds = np.argmax(text_predictions, axis=1)
         # preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
 
         if data_args.return_entity_level_metrics:
@@ -493,15 +490,18 @@ def main():
             return final_results
         else:
             return {
-                "accuracy": (preds == q[1]).astype(np.float32).mean().item(),
-                "precision": results["overall_precision"],
-                "recall": results["overall_recall"],
-                "f1": results["overall_f1"],
-                "seqeval_accuracy": results["overall_accuracy"],
+                "text_accuracy": (text_preds == text_labels).astype(np.float32).mean().item(),
+                "token_precision": results["overall_precision"],
+                "token_recall": results["overall_recall"],
+                "token_f1": results["overall_f1"],
+                "token_accuracy": results["overall_accuracy"],
             }
 
     # Initialize our Trainer
-    # training_args.label_names.append("label")
+    if training_args.label_names == None:
+        training_args.label_names = ["label"]
+    else:
+        training_args.label_names.append("label")
     trainer = MyTrainer(
         model=model,
         args=training_args,
@@ -549,33 +549,35 @@ def main():
         logger.info("*** Predict ***")
 
         predictions, labels, metrics = trainer.predict(predict_dataset, metric_key_prefix="predict")
-        q = (predictions[1], labels[1])
-        predictions, labels = predictions[0], labels[0]
-        predictions = np.argmax(predictions, axis=2)
+        
+        token_predictions, token_labels = predictions[0], labels[0]
+        token_predictions = np.argmax(token_predictions, axis=2)
 
         # Remove ignored index (special tokens)
-        true_predictions = [
+        token_preds = [
             [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
-            for prediction, label in zip(predictions, labels)
+            for prediction, label in zip(token_predictions, token_labels)
         ]
-        preds = np.argmax(q[0], axis=1)
-        true_preds = [
+
+        text_predictions, text_labels = predictions[1], labels[1]
+        preds = np.argmax(text_predictions, axis=1)
+        text_preds = [
             [config.id2cls_label[prediction], config.id2cls_label[label]]
-            for prediction, label in zip(preds, q[1].squeeze())
+            for prediction, label in zip(preds, text_labels.squeeze())
         ]
 
         trainer.log_metrics("predict", metrics)
         trainer.save_metrics("predict", metrics)
 
         # Save predictions
-        output_predictions_file = os.path.join(training_args.output_dir, "predictions.txt")
+        output_predictions_file = os.path.join(training_args.output_dir, "token_predictions.txt")
         if trainer.is_world_process_zero():
             with open(output_predictions_file, "w") as writer:
-                for prediction in true_predictions:
+                for prediction in token_preds:
                     writer.write(" ".join(prediction) + "\n")
-        output_predictions_file = os.path.join(training_args.output_dir, "predictions1.txt")
+        output_predictions_file = os.path.join(training_args.output_dir, "text_predictions.txt")
         with open(output_predictions_file, "w") as writer:
-            for prediction in true_preds:
+            for prediction in text_preds:
                 writer.write(" ".join(prediction) + "\n")
 
     if training_args.push_to_hub:

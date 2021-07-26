@@ -1,9 +1,9 @@
 CUDA_VISIBLE_DEVICE=0
 OUTPUT_DIR=./output
 MODEL_PATH=./pretrained_model/chinese-bert-wwm
-TRAIN_FILE=./data/tiny_train.json
-VAL_FILE=./data/tiny_train.json
-TEST_FILE=./data/tiny_train.json
+TRAIN_FILE=./data/joint_train.json
+VAL_FILE=./data/joint_train.json
+TEST_FILE=./data/joint_train.json
 LOGGING_DIR=$OUTPUT_DIR/runs
 TRAIN_BS=1
 EVAL_BS=8

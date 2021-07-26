@@ -202,7 +202,10 @@ class MyTrainer(Trainer):
             if type(self.model).__name__ in MODEL_FOR_QUESTION_ANSWERING_MAPPING_NAMES.values()
             else ["labels"]
         )
-        self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+        if self.args.label_names is not None:
+            for i in self.args.label_names:
+                default_label_names.append(i)
+        self.label_names = default_label_names
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
         # very last
@@ -865,8 +868,8 @@ class MyTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
-        if "label" not in self.label_names:
-            self.label_names.append("label")
+        # if "label" not in self.label_names:
+        #     self.label_names.append("label")
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
         inputs = self._prepare_inputs(inputs)
         if ignore_keys is None:
@@ -908,7 +911,10 @@ class MyTrainer(Trainer):
                     loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
                     loss = loss.mean().detach()
                     if isinstance(outputs, dict):
-                        logits = tuple(v for k, v in outputs.items() if k in ["pool_logits", "seq_logits"])
+                        if "pool_logits" in outputs.keys() and "seq_logits" in outputs.keys():
+                            logits = tuple(v for k, v in outputs.items() if k in ["pool_logits", "seq_logits"])
+                        else:
+                            logits = tuple(v for k, v in outputs.items() if k not in ignore_keys + ["loss"])
                     else:
                         logits = outputs[1:]
                 else:

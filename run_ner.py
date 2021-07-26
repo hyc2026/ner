@@ -34,7 +34,7 @@ from transformers import (
     AutoConfig,
     # AutoModelForTokenClassification,
     AutoTokenizer,
-    # DataCollatorForTokenClassification,
+    DataCollatorForTokenClassification,
     HfArgumentParser,
     PreTrainedTokenizerFast,
     # Trainer,
@@ -48,7 +48,7 @@ from transformers.utils.versions import require_version
 from my_transformers import (
     MyTrainer,
     MyBertForTokenClassification,
-    MyDataCollatorForTokenClassification,
+    # MyDataCollatorForTokenClassification,
 )
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
@@ -435,7 +435,7 @@ def main():
             )
 
     # Data collator
-    data_collator = MyDataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
+    data_collator = DataCollatorForTokenClassification(tokenizer, pad_to_multiple_of=8 if training_args.fp16 else None)
 
     # Metrics
     metric = load_metric("seqeval")
