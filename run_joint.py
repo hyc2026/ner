@@ -460,7 +460,7 @@ def main():
 
     # Metrics
     metric = load_metric("seqeval")
-    metric1 = load_metric("accuracy")
+    # metric1 = load_metric("accuracy")
 
     def compute_metrics(p):
         q = (p[0][1], p[1][1])
@@ -549,12 +549,19 @@ def main():
         logger.info("*** Predict ***")
 
         predictions, labels, metrics = trainer.predict(predict_dataset, metric_key_prefix="predict")
+        q = (predictions[1], labels[1])
+        predictions, labels = predictions[0], labels[0]
         predictions = np.argmax(predictions, axis=2)
 
         # Remove ignored index (special tokens)
         true_predictions = [
             [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
             for prediction, label in zip(predictions, labels)
+        ]
+        preds = np.argmax(q[0], axis=1)
+        true_preds = [
+            [config.id2cls_label[prediction], config.id2cls_label[label]]
+            for prediction, label in zip(preds, q[1].squeeze())
         ]
 
         trainer.log_metrics("predict", metrics)
@@ -566,6 +573,10 @@ def main():
             with open(output_predictions_file, "w") as writer:
                 for prediction in true_predictions:
                     writer.write(" ".join(prediction) + "\n")
+        output_predictions_file = os.path.join(training_args.output_dir, "predictions1.txt")
+        with open(output_predictions_file, "w") as writer:
+            for prediction in true_preds:
+                writer.write(" ".join(prediction) + "\n")
 
     if training_args.push_to_hub:
         kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "token-classification"}
