@@ -636,23 +636,6 @@ class MyTrainer(Trainer):
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
-        """
-        Perform a training step on a batch of inputs.
-
-        Subclass and override to inject custom behavior.
-
-        Args:
-            model (:obj:`nn.Module`):
-                The model to train.
-            inputs (:obj:`Dict[str, Union[torch.Tensor, Any]]`):
-                The inputs and targets of the model.
-
-                The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
-                argument :obj:`labels`. Check your model's documentation for all accepted arguments.
-
-        Return:
-            :obj:`torch.Tensor`: The tensor with training loss on this batch.
-        """
         model.train()
         inputs = self._prepare_inputs(inputs)
 
@@ -660,6 +643,12 @@ class MyTrainer(Trainer):
             scaler = self.scaler if self.use_amp else None
             loss_mb = smp_forward_backward(model, inputs, self.args.gradient_accumulation_steps, scaler=scaler)
             return loss_mb.reduce_mean().detach().to(self.args.device)
+
+        if hasattr(self.args, "taskname") and self.args.taskname == "crf":
+            for i in inputs["labels"]:
+                for j in range(len(i)):
+                    if i[j] == -100:
+                        i[j] = self.args.num_labels - 1
 
         if self.use_amp:
             with autocast():
@@ -868,8 +857,7 @@ class MyTrainer(Trainer):
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor], Optional[torch.Tensor]]:
-        # if "label" not in self.label_names:
-        #     self.label_names.append("label")
+
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
         inputs = self._prepare_inputs(inputs)
         if ignore_keys is None:
@@ -885,6 +873,12 @@ class MyTrainer(Trainer):
                 labels = labels[0]
         else:
             labels = None
+
+        if hasattr(self.args, "taskname") and self.args.taskname == "crf":
+            for i in inputs["labels"]:
+                for j in range(len(i)):
+                    if i[j] == -100:
+                        i[j] = self.args.num_labels - 1
 
         with torch.no_grad():
             if is_sagemaker_mp_enabled():

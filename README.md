@@ -12,3 +12,5 @@ tiny_train.json
 
 transformers_path
 ~/miniconda3/envs/nlp/lib/python3.7/site-packages/transformers
+
+crf在 training_step 和 evaluation_step 中将-100改掉，必须给参数 --taskname crf
