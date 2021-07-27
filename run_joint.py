@@ -332,7 +332,7 @@ def main():
     
     cls_label_to_id = {v: i for i, v in enumerate(cls_label_list)}
 
-    if label_to_id is not None:
+    if cls_label_to_id is not None:
         config.cls_label2id = cls_label_to_id
         config.id2cls_label = {id: label for label, id in config.cls_label2id.items()}
 
