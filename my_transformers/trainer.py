@@ -447,6 +447,8 @@ class MyTrainer(Trainer):
 
         # tr_loss is a tensor to avoid synchronization of TPUs through .item()
         tr_loss = torch.tensor(0.0).to(args.device)
+        tr_ner_loss = torch.tensor(0.0).to(args.device)
+        tr_cls_loss = torch.tensor(0.0).to(args.device)
         # _total_loss_scalar is updated everytime .item() has to be called on tr_loss and stores the sum of all losses
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
@@ -506,9 +508,15 @@ class MyTrainer(Trainer):
                 ):
                     # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                     with model.no_sync():
-                        tr_loss += self.training_step(model, inputs)
+                        loss, ner_loss, cls_loss = self.training_step(model, inputs)
+                        tr_loss += loss
+                        tr_ner_loss += ner_loss
+                        tr_cls_loss += cls_loss
                 else:
-                    tr_loss += self.training_step(model, inputs)
+                    loss, ner_loss, cls_loss = self.training_step(model, inputs)
+                    tr_loss += loss
+                    tr_ner_loss += ner_loss
+                    tr_cls_loss += cls_loss
                 self.current_flos += float(self.floating_point_ops(inputs))
 
                 # Optimizer step for deepspeed must be called on every step regardless of the value of gradient_accumulation_steps
@@ -564,13 +572,13 @@ class MyTrainer(Trainer):
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
 
-                    self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+                    self._maybe_log_save_evaluate((tr_loss, tr_ner_loss, tr_cls_loss), model, trial, epoch, ignore_keys_for_eval)
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
 
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-            self._maybe_log_save_evaluate(tr_loss, model, trial, epoch, ignore_keys_for_eval)
+            self._maybe_log_save_evaluate((tr_loss, tr_ner_loss, tr_cls_loss), model, trial, epoch, ignore_keys_for_eval)
 
             if DebugOption.TPU_METRICS_DEBUG in self.args.debug:
                 if is_torch_tpu_available():
@@ -653,16 +661,20 @@ class MyTrainer(Trainer):
 
         if self.use_amp:
             with autocast():
-                loss = self.compute_loss(model, inputs)
+                loss, ner_loss, cls_loss = self.compute_loss(model, inputs)
         else:
-            loss = self.compute_loss(model, inputs)
+            loss, ner_loss, cls_loss = self.compute_loss(model, inputs)
 
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training
+            ner_loss = ner_loss.mean()
+            cls_loss = cls_loss.mean()
 
         if self.args.gradient_accumulation_steps > 1 and not self.deepspeed:
             # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
             loss = loss / self.args.gradient_accumulation_steps
+            ner_loss = ner_loss / self.args.gradient_accumulation_steps
+            cls_loss = cls_loss / self.args.gradient_accumulation_steps
 
         if self.use_amp:
             self.scaler.scale(loss).backward()
@@ -675,7 +687,7 @@ class MyTrainer(Trainer):
         else:
             loss.backward()
 
-        return loss.detach()
+        return loss.detach(), ner_loss.detach(), cls_loss.detach()
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
@@ -703,7 +715,9 @@ class MyTrainer(Trainer):
                     ner_loss = outputs["ner_loss"]
                     cls_loss = outputs["cls_loss"]
                 else:
-                    loss, ner_loss, cls_loss = outputs[0:3]
+                    loss = outputs[0]
+                    ner_loss = outputs[1]
+                    cls_loss = outputs[2]
             return ((loss, ner_loss, cls_loss), outputs) if return_outputs else (loss, ner_loss, cls_loss)
         else:
             if labels is not None:
@@ -714,14 +728,21 @@ class MyTrainer(Trainer):
 
             return (loss, outputs) if return_outputs else loss
 
-    def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
+    def _maybe_log_save_evaluate(self, losses, model, trial, epoch, ignore_keys_for_eval):
         if self.control.should_log:
             logs: Dict[str, float] = {}
+            tr_loss, tr_ner_loss, tr_cls_loss = losses
             tr_loss_scalar = tr_loss.item()
+            tr_ner_loss_scalar = tr_ner_loss.item()
+            tr_cls_loss_scalar = tr_cls_loss.item()
             # reset tr_loss to zero
             tr_loss -= tr_loss
+            tr_ner_loss -= tr_ner_loss
+            tr_cls_loss -= tr_cls_loss
 
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            logs["ner_loss"] = round(tr_ner_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
+            logs["cls_loss"] = round(tr_cls_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 4)
             logs["learning_rate"] = self._get_learning_rate()
 
             self._total_loss_scalar += tr_loss_scalar
@@ -917,14 +938,15 @@ class MyTrainer(Trainer):
             else:
                 if has_labels:
                     loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+                    loss, ner_loss, cls_loss = loss
                     loss = loss.mean().detach()
                     if isinstance(outputs, dict):
-                        if "pool_logits" in outputs.keys() and "seq_logits" in outputs.keys():
-                            logits = tuple(v for k, v in outputs.items() if k in ["pool_logits", "seq_logits"])
+                        if "ner_logits" in outputs.keys() and "cls_logits" in outputs.keys():
+                            logits = tuple(v for k, v in outputs.items() if k in ["ner_logits", "cls_logits"])
                         else:
                             logits = tuple(v for k, v in outputs.items() if k not in ignore_keys + ["loss"])
                     else:
-                        logits = outputs[1:]
+                        logits = outputs[3:]
                 else:
                     loss = None
                     if self.use_amp:

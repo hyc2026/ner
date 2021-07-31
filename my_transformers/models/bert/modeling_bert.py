@@ -102,10 +102,10 @@ class MyBertForJointClassification(BertForTokenClassification):
             cls_loss = loss_fct(cls_logits.view(-1, self.num_label), label.view(-1))
 
         gama = 0.5
-        loss=gama * ner_loss + (1 - gama) * cls_loss,
-        # if not return_dict:
-        output = (ner_logits, cls_output,) + outputs[2:]
-        return ((loss, ner_loss, cls_loss) + output) if loss is not None else output
+        loss=gama * ner_loss + (1 - gama) * cls_loss
+        if not return_dict:
+            output = (ner_logits, cls_output,) + outputs[2:]
+            return ((loss, ner_loss, cls_loss) + output) if loss is not None else output
         
         return MyTokenClassifierOutput(
             loss=loss,
