@@ -73,66 +73,48 @@ class MyBertForJointClassification(BertForTokenClassification):
             return_dict=return_dict,
         )
 
-        sequence_output = outputs[0]
-        pooled_output = outputs[0][:, 0, :]
+        ner_output = outputs[0]
+        cls_output = outputs[0][:, 0, :]
 
-        sequence_output = self.dropout(sequence_output)
-        sequence_logits = self.classifier(sequence_output)
-        pooled_output = self.dropout1(pooled_output)
-        pooled_logits = self.classifier1(pooled_output)
+        ner_output = self.dropout(ner_output)
+        ner_logits = self.classifier(ner_output)
+        cls_output = self.dropout1(cls_output)
+        cls_logits = self.classifier1(cls_output)
 
-        sequence_loss = None
+        ner_loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()
             # Only keep active parts of the loss
             if attention_mask is not None:
                 active_loss = attention_mask.view(-1) == 1
-                active_logits = sequence_logits.view(-1, self.num_labels)
+                active_logits = ner_logits.view(-1, self.num_labels)
                 active_labels = torch.where(
                     active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
                 )
-                sequence_loss = loss_fct(active_logits, active_labels)
+                ner_loss = loss_fct(active_logits, active_labels)
             else:
-                sequence_loss = loss_fct(sequence_logits.view(-1, self.num_labels), labels.view(-1))
+                ner_loss = loss_fct(ner_logits.view(-1, self.num_labels), labels.view(-1))
 
-        pooled_loss = None
+        cls_loss = None
         if label is not None:
-            # if self.config.problem_type is None:
-            #     if self.num_label == 1:
-            #         self.config.problem_type = "regression"
-            #     elif self.num_label > 1 and (labels.dtype == torch.long or labels.dtype == torch.int):
-            #         self.config.problem_type = "single_label_classification"
-            #     else:
-            #         self.config.problem_type = "multi_label_classification"
             self.config.problem_type = "single_label_classification"
             loss_fct = CrossEntropyLoss()
-            pooled_loss = loss_fct(pooled_logits.view(-1, self.num_label), label.view(-1))
-            # if self.config.problem_type == "regression":
-            #     loss_fct = MSELoss()
-            #     if self.num_labels == 1:
-            #         pooled_loss = loss_fct(logits.squeeze(), labels.squeeze())
-            #     else:
-            #         pooled_loss = loss_fct(logits, labels)
-            # elif self.config.problem_type == "single_label_classification":
-            #     loss_fct = CrossEntropyLoss()
-            #     pooled_loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            # elif self.config.problem_type == "multi_label_classification":
-            #     loss_fct = BCEWithLogitsLoss()
-            #     loss = loss_fct(logits, labels)
-
-        if not return_dict:
-            output = (logits,) + outputs[2:]
-            return ((loss,) + output) if loss is not None else output
+            cls_loss = loss_fct(cls_logits.view(-1, self.num_label), label.view(-1))
 
         gama = 0.5
+        loss=gama * ner_loss + (1 - gama) * cls_loss,
+        # if not return_dict:
+        output = (ner_logits, cls_output,) + outputs[2:]
+        return ((loss, ner_loss, cls_loss) + output) if loss is not None else output
+        
         return MyTokenClassifierOutput(
-            loss=gama * sequence_loss + (1 - gama) * pooled_loss,
+            loss=loss,
+            ner_loss=ner_loss,
+            cls_loss=cls_loss,
+            ner_logits=ner_logits,
+            cls_logits=cls_logits,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-            seq_loss=sequence_loss,
-            pool_loss=pooled_loss,
-            seq_logits=sequence_logits,
-            pool_logits=pooled_logits,
         )
 
 class MyBertForSequenceClassification(BertForSequenceClassification):

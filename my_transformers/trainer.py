@@ -1,3 +1,4 @@
+from my_transformers.models.bert.modeling_bert import MyBertForJointClassification
 from transformers.trainer import *
 from transformers import Trainer
 
@@ -692,13 +693,26 @@ class MyTrainer(Trainer):
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
 
-        if labels is not None:
-            loss = self.label_smoother(outputs, labels)
+        if isinstance(model, MyBertForJointClassification):
+            if labels is not None:
+                loss = self.label_smoother(outputs, labels)
+            else:
+                # We don't use .loss here since the model may return tuples instead of ModelOutput.
+                if isinstance(outputs, dict):
+                    loss = outputs["loss"]
+                    ner_loss = outputs["ner_loss"]
+                    cls_loss = outputs["cls_loss"]
+                else:
+                    loss, ner_loss, cls_loss = outputs[0:3]
+            return ((loss, ner_loss, cls_loss), outputs) if return_outputs else (loss, ner_loss, cls_loss)
         else:
-            # We don't use .loss here since the model may return tuples instead of ModelOutput.
-            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+            if labels is not None:
+                loss = self.label_smoother(outputs, labels)
+            else:
+                # We don't use .loss here since the model may return tuples instead of ModelOutput.
+                loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
 
-        return (loss, outputs) if return_outputs else loss
+            return (loss, outputs) if return_outputs else loss
 
     def _maybe_log_save_evaluate(self, tr_loss, model, trial, epoch, ignore_keys_for_eval):
         if self.control.should_log:

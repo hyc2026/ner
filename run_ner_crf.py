@@ -455,11 +455,11 @@ def main():
 
         # Remove ignored index (special tokens)
         true_predictions = [
-            [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+            [label_list[p] for (p, l) in zip(prediction, label) if (l != -100 and l != num_labels - 1)]
             for prediction, label in zip(predictions, labels)
         ]
         true_labels = [
-            [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+            [label_list[l] for (p, l) in zip(prediction, label) if (l != -100 and l != num_labels - 1)]
             for prediction, label in zip(predictions, labels)
         ]
 
